@@ -1,8 +1,6 @@
-🚀 VoxNote-AI
-AI-powered Vision → Notes → Voice → Quiz Pipeline
-🌐 Live Demo
+# 🚀 VoxNote-AI
 
-👉 Try it now: https://voxnote-ai.streamlit.app/
+### *AI-powered Vision → Notes → Voice → Quiz Pipeline*
 
 <p align="center">
   <img src="https://img.shields.io/badge/Build-Passing-success?style=for-the-badge" />
@@ -12,6 +10,12 @@ AI-powered Vision → Notes → Voice → Quiz Pipeline
   <img src="https://img.shields.io/badge/Frontend-Streamlit-red?style=for-the-badge" />
   <img src="https://img.shields.io/badge/Voice-gTTS-purple?style=for-the-badge" />
 </p>
+
+---
+
+## 🌐 Live Demo
+
+👉 **Try it now:** https://voxnote-ai.streamlit.app/
 
 ---
 
