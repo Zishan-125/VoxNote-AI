@@ -1,71 +1,87 @@
-
 import io
+import os
+import time
 import streamlit as st
-
+from PIL import Image
 from google import genai
-from dotenv import load_dotenv
 from gtts import gTTS
 
-import os
+# --- 1. SECURE API INITIALIZATION ---
+# This ensures the code works both locally (.env) and on Streamlit Cloud (Secrets)
+if "GEMINI_API_KEY" in st.secrets:
+    api_key = st.secrets["GEMINI_API_KEY"]
+else:
+    from dotenv import load_dotenv
+    load_dotenv()
+    api_key = os.getenv("GEMINI_API_KEY")
 
+if not api_key:
+    st.error("Missing API Key. Please configure GEMINI_API_KEY in Secrets or .env.")
+    st.stop()
 
-
-#load environment variables from .env file
-load_dotenv()
-
-api_key = os.getenv("GEMINI_API_KEY")
-
-#initializing a client
-
+# Initializing the Google GenAI client
 genai_client = genai.Client(api_key=api_key)
 
-#Note Generator
 
-from PIL import Image # Add this import at the top
-
+# --- 2. NOTE GENERATOR ---
 def note_generator(images):
-    # Convert Streamlit UploadedFile objects to PIL Images
-    pil_images = [Image.open(img) for img in images]
-    
-    prompt = """Summarize the picture in note format at max 100 words, 
-    and make sure to include all the important points."""
-    
-    # Use the converted list 'pil_images'
-    response = genai_client.models.generate_content(
-        model="gemini-2.5-flash-lite", 
-        contents=pil_images + [prompt] # Combine list of images with the prompt
-    )
-    
-    return response.text
-
-
-def audio_transcription(text):
+    """Processes images and returns a structured summary."""
     try:
-        from gtts import gTTS
-        import io
+        pil_images = [Image.open(img) for img in images]
         
-        audio_buffer = io.BytesIO()
-        speech = gTTS(text=text, lang='en', slow=False)
-        speech.write_to_fp(audio_buffer)
-        audio_buffer.seek(0)
-        return audio_buffer
+        prompt = """Summarize the picture in note format at max 100 words. 
+        Focus on extracting key concepts, dates, and definitions. 
+        Use bullet points for readability."""
+        
+        response = genai_client.models.generate_content(
+            model="gemini-2.5-flash-lite", 
+            contents=pil_images + [prompt]
+        )
+        return response.text
     except Exception as e:
-        print(f"gTTS Error: {e}")
-        return None
-    
-    
+        return f"Error generating notes: {str(e)}"
+
+
+# --- 3. AUDIO TRANSCRIPTION (WITH RETRY LOGIC) ---
+def audio_transcription(text):
+    """Converts text to speech using gTTS with error handling."""
+    # Max 3 attempts to handle 'Failed to connect' network spikes
+    for attempt in range(3):
+        try:
+            audio_buffer = io.BytesIO()
+            speech = gTTS(text=text, lang='en', slow=False)
+            speech.write_to_fp(audio_buffer)
+            audio_buffer.seek(0)
+            return audio_buffer
+        except Exception as e:
+            if attempt < 2:
+                time.sleep(2)  # Wait 2 seconds before retrying
+                continue
+            print(f"gTTS Error after 3 attempts: {e}")
+            return None
+
+
+# --- 4. QUIZ GENERATOR ---
 def quiz_generator(images, difficulty):
-    # 1. Convert the Streamlit upload objects to PIL Images (The missing step!)
-    pil_images = [Image.open(img) for img in images]
-    
-    prompt = f"""Generate 3 quizzes based on the provided images with {difficulty} difficulty. 
-    Make sure to add markdown to differentiate the question and options. 
-    Also make sure to include the correct answer in the quiz."""
-    
-    # 2. Use the converted pil_images list
-    response = genai_client.models.generate_content(
-        model="gemini-2.5-flash-lite", 
-        contents=pil_images + [prompt] 
-    )
-    
-    return response.text
+    """Generates 3 multiple-choice questions based on image content."""
+    try:
+        pil_images = [Image.open(img) for img in images]
+        
+        prompt = f"""Generate 3 quizzes based on the provided images with {difficulty} difficulty. 
+        Format as follows:
+        **Question X:** [The question]
+        - A) [Option]
+        - B) [Option]
+        - C) [Option]
+        - D) [Option]
+        
+        **Correct Answer:** [The letter]
+        """
+        
+        response = genai_client.models.generate_content(
+            model="gemini-2.5-flash-lite", 
+            contents=pil_images + [prompt] 
+        )
+        return response.text
+    except Exception as e:
+        return f"Error generating quiz: {str(e)}"
